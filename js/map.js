@@ -146,7 +146,7 @@ container.addEventListener('touchmove', (e) => {
 
 container.addEventListener('touchend', (e) => {
     if (e.touches.length < 2) isDragging = false;
-    if (scale <= MIN_SCALE) resetView();
+    // ❌ resetView() 제거 - 손가락 떼도 줌 상태 유지
 });
 
 // 더블탭으로 줌 리셋
@@ -160,8 +160,8 @@ container.addEventListener('touchend', () => {
 // 리셋 버튼
 resetBtn.addEventListener('click', () => resetView());
 
-// 마우스 휠 줌 (PC 테스트용)
-container.addEventListener('wheel', (e) => {
+// 마우스 휠 줌 (PC 테스트용) - window에 달아야 작동
+window.addEventListener('wheel', (e) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * delta));
