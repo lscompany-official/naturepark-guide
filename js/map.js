@@ -3,50 +3,50 @@ const img = document.getElementById('mapImage');
 const resetBtn = document.getElementById('resetBtn');
 
 let scale = 1;
-let translateX = 0;
-let translateY = 0;
+let posX = 0;
+let posY = 0;
 const MIN_SCALE = 1;
 const MAX_SCALE = 5;
+const ZOOM_SENSITIVITY = 0.1;
 
 // =============================================
-// transform 적용
+// Transform 적용
 // =============================================
-function applyTransform(animated = false) {
-    img.style.transition = animated ? 'transform 0.3s ease' : 'none';
-    img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+function updateTransform(animated = false) {
+    img.style.transition = animated ? 'transform 0.3s ease-out' : 'none';
+    img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
 }
 
 // =============================================
-// 이동 범위 제한 (이미지 밖으로 못 나가게)
+// 경계 제한 (이미지가 화면 밖으로 나가지 않도록)
 // =============================================
-function clamp() {
-    const cW = container.clientWidth;
-    const cH = container.clientHeight;
-
-    const nW = img.naturalWidth || img.clientWidth;
-    const nH = img.naturalHeight || img.clientHeight;
-    const ratio = nW / nH;
-    const cRatio = cW / cH;
-
-    let imgW, imgH, offX, offY;
-    if (ratio > cRatio) {
-        imgW = cW; imgH = cW / ratio;
+function constrainPosition() {
+    const containerRect = container.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
+    
+    // 확대된 이미지의 실제 크기
+    const scaledWidth = imgRect.width;
+    const scaledHeight = imgRect.height;
+    
+    // 컨테이너 크기
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+    
+    // 이미지가 컨테이너보다 작으면 중앙 정렬
+    if (scaledWidth <= containerWidth) {
+        posX = 0;
     } else {
-        imgH = cH; imgW = cH * ratio;
+        // 이미지가 컨테이너보다 크면 경계 제한
+        const maxX = (scaledWidth - containerWidth) / 2;
+        posX = Math.max(-maxX, Math.min(maxX, posX));
     }
-    offX = (cW - imgW) / 2;
-    offY = (cH - imgH) / 2;
-
-    const scaledW = imgW * scale;
-    const scaledH = imgH * scale;
-
-    const maxTx = offX * scale;
-    const minTx = cW - scaledW - offX * scale;
-    const maxTy = offY * scale;
-    const minTy = cH - scaledH - offY * scale;
-
-    translateX = Math.min(maxTx, Math.max(minTx, translateX));
-    translateY = Math.min(maxTy, Math.max(minTy, translateY));
+    
+    if (scaledHeight <= containerHeight) {
+        posY = 0;
+    } else {
+        const maxY = (scaledHeight - containerHeight) / 2;
+        posY = Math.max(-maxY, Math.min(maxY, posY));
+    }
 }
 
 // =============================================
@@ -54,132 +54,232 @@ function clamp() {
 // =============================================
 function resetView(animated = true) {
     scale = 1;
-    translateX = 0;
-    translateY = 0;
-    applyTransform(animated);
+    posX = 0;
+    posY = 0;
+    updateTransform(animated);
 }
 
-window.addEventListener('resize', () => resetView(false));
-resetBtn.addEventListener('click', () => resetView());
+// 창 크기 변경 시 초기화
+window.addEventListener('resize', () => {
+    resetView(false);
+});
+
+// 리셋 버튼 (주석 처리되어 있지만 기능 유지)
+if (resetBtn) {
+    resetBtn.addEventListener('click', () => resetView());
+}
 
 // =============================================
-// 핀치 줌
+// 터치 관련 유틸리티 함수
 // =============================================
-let lastPinchDist = 0;
-let isPinching = false;
-
-function dist(e) {
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
+function getTouchDistance(touch1, touch2) {
+    const dx = touch1.clientX - touch2.clientX;
+    const dy = touch1.clientY - touch2.clientY;
     return Math.sqrt(dx * dx + dy * dy);
 }
-function mid(e) {
+
+function getTouchCenter(touch1, touch2) {
     return {
-        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2
     };
 }
 
 // =============================================
-// 드래그
+// 핀치 줌 (모바일)
 // =============================================
+let initialDistance = 0;
+let initialScale = 1;
+let isPinching = false;
+let pinchCenter = { x: 0, y: 0 };
+
+// 드래그 관련 변수
 let isDragging = false;
-let lastDragX = 0, lastDragY = 0;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragStartPosX = 0;
+let dragStartPosY = 0;
 
-// =============================================
-// 더블탭 (단일 터치만)
-// =============================================
+// 더블탭 관련 변수
 let lastTapTime = 0;
-let lastTapCount = 0; // 터치 수 기록
+const DOUBLE_TAP_DELAY = 300;
 
+// =============================================
+// 터치 이벤트 핸들러
+// =============================================
 container.addEventListener('touchstart', (e) => {
     e.preventDefault();
-
-    if (e.touches.length === 2) {
-        isDragging = false;
+    
+    const touches = e.touches;
+    
+    if (touches.length === 2) {
+        // 핀치 줌 시작
         isPinching = true;
-        lastPinchDist = dist(e);
-    } else if (e.touches.length === 1) {
-        isDragging = true;
-        isPinching = false;
-        lastDragX = e.touches[0].clientX;
-        lastDragY = e.touches[0].clientY;
+        isDragging = false;
+        
+        initialDistance = getTouchDistance(touches[0], touches[1]);
+        initialScale = scale;
+        pinchCenter = getTouchCenter(touches[0], touches[1]);
+        
+    } else if (touches.length === 1) {
+        // 드래그 또는 더블탭
+        const touch = touches[0];
+        const currentTime = Date.now();
+        
+        // 더블탭 감지
+        if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
+            resetView();
+            lastTapTime = 0;
+            return;
+        }
+        lastTapTime = currentTime;
+        
+        // 드래그 시작
+        if (!isPinching) {
+            isDragging = true;
+            dragStartX = touch.clientX;
+            dragStartY = touch.clientY;
+            dragStartPosX = posX;
+            dragStartPosY = posY;
+        }
     }
-
-    lastTapCount = e.touches.length;
 }, { passive: false });
 
 container.addEventListener('touchmove', (e) => {
     e.preventDefault();
-
-    if (e.touches.length === 2 && isPinching) {
-        const newDist = dist(e);
-        const m = mid(e);
-        const delta = newDist / lastPinchDist;
-        const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * delta));
-
-        const rect = container.getBoundingClientRect();
-        const ox = m.x - rect.left;
-        const oy = m.y - rect.top;
-
-        translateX = ox - (ox - translateX) * (newScale / scale);
-        translateY = oy - (oy - translateY) * (newScale / scale);
+    
+    const touches = e.touches;
+    
+    if (touches.length === 2 && isPinching) {
+        // 핀치 줌 진행
+        const currentDistance = getTouchDistance(touches[0], touches[1]);
+        const currentCenter = getTouchCenter(touches[0], touches[1]);
+        
+        // 스케일 변화 계산
+        const scaleChange = currentDistance / initialDistance;
+        let newScale = initialScale * scaleChange;
+        newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+        
+        // 줌 중심점을 기준으로 위치 조정
+        const containerRect = container.getBoundingClientRect();
+        const centerX = currentCenter.x - containerRect.left - containerRect.width / 2;
+        const centerY = currentCenter.y - containerRect.top - containerRect.height / 2;
+        
+        // 새로운 위치 계산 (중심점 유지)
+        const scaleRatio = newScale / scale;
+        posX = centerX - (centerX - posX) * scaleRatio;
+        posY = centerY - (centerY - posY) * scaleRatio;
         scale = newScale;
-
-        clamp();
-        applyTransform();
-
-        lastPinchDist = newDist;
-
-    } else if (e.touches.length === 1 && isDragging) {
-        translateX += e.touches[0].clientX - lastDragX;
-        translateY += e.touches[0].clientY - lastDragY;
-
-        clamp();
-        applyTransform();
-
-        lastDragX = e.touches[0].clientX;
-        lastDragY = e.touches[0].clientY;
+        
+        constrainPosition();
+        updateTransform();
+        
+    } else if (touches.length === 1 && isDragging && !isPinching) {
+        // 드래그 진행
+        const touch = touches[0];
+        const deltaX = touch.clientX - dragStartX;
+        const deltaY = touch.clientY - dragStartY;
+        
+        posX = dragStartPosX + deltaX;
+        posY = dragStartPosY + deltaY;
+        
+        constrainPosition();
+        updateTransform();
     }
 }, { passive: false });
 
 container.addEventListener('touchend', (e) => {
-    // 핀치가 끝난 경우 → 더블탭 무시
-    if (isPinching || lastTapCount === 2) {
+    const touches = e.touches;
+    
+    if (touches.length < 2) {
         isPinching = false;
+    }
+    
+    if (touches.length === 0) {
         isDragging = false;
-        return;
     }
+});
 
-    // 단일 터치 더블탭 감지
-    const now = Date.now();
-    if (now - lastTapTime < 300) {
-        resetView();
-        lastTapTime = 0;
-    } else {
-        lastTapTime = now;
-    }
-
+container.addEventListener('touchcancel', () => {
+    isPinching = false;
     isDragging = false;
+});
+
+// =============================================
+// 마우스 이벤트 (PC)
+// =============================================
+let isMouseDragging = false;
+let mouseStartX = 0;
+let mouseStartY = 0;
+let mouseDragStartPosX = 0;
+let mouseDragStartPosY = 0;
+
+container.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    isMouseDragging = true;
+    mouseStartX = e.clientX;
+    mouseStartY = e.clientY;
+    mouseDragStartPosX = posX;
+    mouseDragStartPosY = posY;
+    img.style.cursor = 'grabbing';
+});
+
+container.addEventListener('mousemove', (e) => {
+    if (!isMouseDragging) return;
+    
+    e.preventDefault();
+    const deltaX = e.clientX - mouseStartX;
+    const deltaY = e.clientY - mouseStartY;
+    
+    posX = mouseDragStartPosX + deltaX;
+    posY = mouseDragStartPosY + deltaY;
+    
+    constrainPosition();
+    updateTransform();
+});
+
+container.addEventListener('mouseup', () => {
+    isMouseDragging = false;
+    img.style.cursor = 'grab';
+});
+
+container.addEventListener('mouseleave', () => {
+    isMouseDragging = false;
+    img.style.cursor = 'grab';
 });
 
 // =============================================
 // 마우스 휠 줌 (PC)
 // =============================================
-document.addEventListener('wheel', (e) => {
+container.addEventListener('wheel', (e) => {
     e.preventDefault();
-
-    const delta = e.deltaY < 0 ? 1.1 : 0.9;
-    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * delta));
-
-    const rect = container.getBoundingClientRect();
-    const ox = e.clientX - rect.left;
-    const oy = e.clientY - rect.top;
-
-    translateX = ox - (ox - translateX) * (newScale / scale);
-    translateY = oy - (oy - translateY) * (newScale / scale);
+    
+    const containerRect = container.getBoundingClientRect();
+    const mouseX = e.clientX - containerRect.left - containerRect.width / 2;
+    const mouseY = e.clientY - containerRect.top - containerRect.height / 2;
+    
+    // 휠 방향에 따라 확대/축소
+    const delta = e.deltaY > 0 ? -ZOOM_SENSITIVITY : ZOOM_SENSITIVITY;
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * (1 + delta)));
+    
+    // 마우스 위치를 중심으로 확대/축소
+    const scaleRatio = newScale / scale;
+    posX = mouseX - (mouseX - posX) * scaleRatio;
+    posY = mouseY - (mouseY - posY) * scaleRatio;
     scale = newScale;
-
-    clamp();
-    applyTransform();
+    
+    constrainPosition();
+    updateTransform();
 }, { passive: false });
+
+// =============================================
+// 초기 로드 시 이미지가 로드된 후 설정
+// =============================================
+img.addEventListener('load', () => {
+    resetView(false);
+});
+
+// 이미지가 이미 로드된 경우
+if (img.complete) {
+    resetView(false);
+}
