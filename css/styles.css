@@ -120,12 +120,12 @@ body {
 
 .back-button {
     left: 20px;
-    background-image: url('/img/back-icon.png');
+    background-image: url('../img/back-icon.png');
 }
 
 .home-button {
     right: 20px;
-    background-image: url('/img/home-icon.png');
+    background-image: url('../img/home-icon.png');
 }
 
 .back-button:active,
