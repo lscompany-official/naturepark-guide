@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Nature Park 가이드</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+
+<body>
+    <div class="container fade-enter">
+        <!-- 뒤로가기 / 홈 버튼 -->
+        <a href="javascript:history.back()" class="back-button" aria-label="뒤로가기"></a>
+        <a href="../index.html" class="home-button" aria-label="홈으로"></a>
+
+        <!-- 1. 배경 이미지 -->
+        <div class="background">
+            <img src="../img/playground-background.png" alt="플레이존" class="bg-image">
+        </div>
+
+        <!-- 2. 클릭영역 이미지 -->
+        <div class="overlay-layer">
+            <img src="../img/playground-overlay.png" alt="" class="overlay-image">
+        </div>
+
+        <div class="clickable-areas">
+            <!-- 무지개썰매 -->
+            <a href="../sub/play/play-1.html" class="click-area"
+                style="top: 47.9%; left: 4.4%; width: 27.2%; height: 18.0%;">
+                <span class="sr-only">무지개썰매</span>
+            </a>
+            <!-- 미니기차 -->
+            <a href="../sub/play/play-2.html" class="click-area"
+                style="top: 47.9%; left: 35.6%; width: 27.2%; height: 18.0%;">
+                <span class="sr-only">미니기차</span>
+            </a>
+            <!-- 카약 -->
+            <a href="../sub/play/play-3.html" class="click-area"
+                style="top: 47.9%; left: 66.4%; width: 27.2%; height: 18.0%;">
+                <span class="sr-only">카약</span>
+            </a>
+            <!-- 플레이가든 -->
+            <a href="../sub/play/play-4.html" class="click-area"
+                style="top: 68.6%; left: 20.0%; width: 27.2%; height: 18.0%;">
+                <span class="sr-only">플레이가든</span>
+            </a>
+            <!-- 플라워가든 -->
+            <a href="../sub/play/play-5.html" class="click-area"
+                style="top: 68.6%; left: 51.3%; width: 27.2%; height: 18.0%;">
+                <span class="sr-only">플라워가든</span>
+            </a>
+        </div>
+    </div>
+
+    <script src="../js/script.js"></script>
+</body>
+
+</html>
